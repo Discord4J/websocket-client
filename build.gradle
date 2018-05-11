@@ -1,0 +1,141 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'com.jfrog.bintray' version '1.8.0'
+    id 'com.jfrog.artifactory' version '4.4.4'
+}
+
+ext {
+    // Project constants
+    github_org = 'Discord4J'
+    project_name = 'websocket-client'
+    artifact_group = 'com.discord4j'
+    project_version = '0.7.7'
+    project_description = 'Websocket client over reactor-netty'
+    project_jdk = '1.8'
+
+    // Dependencies
+    jsr305_version = '3.0.2'
+    junit_version = '4.12'
+}
+
+group = artifact_group
+version = project_version
+description = project_description
+
+sourceCompatibility = project_jdk
+targetCompatibility = project_jdk
+
+repositories {
+    jcenter()
+    mavenCentral()
+    maven { url "https://repo.spring.io/snapshot" }
+    maven { url "https://repo.spring.io/milestone" }
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    compile "com.github.quanticc:reactor-netty:eca0461"
+    compile "com.google.code.findbugs:jsr305:$jsr305_version"
+
+    testCompile "junit:junit:$junit_version"
+}
+
+task downloadDependencies() {
+    description 'Download all dependencies to the Gradle cache'
+    doLast {
+        configurations.findAll { it.canBeResolved }.files
+    }
+}
+
+javadoc.options.encoding = 'UTF-8'
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from 'build/docs/javadoc'
+}
+
+task sourcesJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives javadocJar
+    archives sourcesJar
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+        }
+    }
+}
+
+bintray {
+    user = project.hasProperty('bintrayUser') ? project.property('bintrayUser') : System.getenv('BINTRAY_USER')
+    key = project.hasProperty('bintrayKey') ? project.property('bintrayKey') : System.getenv('BINTRAY_KEY')
+    publications = ['maven']
+    dryRun = false
+    publish = true
+    pkg {
+        userOrg = 'austinv11'
+        repo = 'maven'
+        websiteUrl = 'https://discord4j.com'
+        issueTrackerUrl = 'https://github.com/Discord4J/websocket-client/issues'
+        vcsUrl = 'https://github.com/Discord4J/websocket-client.git'
+        licenses = ['LGPL-3.0']
+        labels = ['discord', 'discord4j', 'd4j', 'reactor']
+        publicDownloadNumbers = true
+        attributes = [:]
+        version {
+            name = project.version
+            vcsTag = project.version
+            gpg {
+                sign = true
+            }
+            if (project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword')) {
+                def sonatypeUsername = project.property('sonatypeUsername')
+                def sonatypePassword = project.property('sonatypePassword')
+                mavenCentralSync {
+                    user = sonatypeUsername
+                    password = sonatypePassword
+                }
+            }
+        }
+    }
+}
+
+artifactory {
+    contextUrl = 'https://oss.jfrog.org'
+    resolve {
+        repository {
+            repoKey = 'jcenter'
+        }
+    }
+    publish {
+        repository {
+            repoKey = 'oss-snapshot-local'
+
+            username = project.hasProperty('bintrayUser') ? project.property('bintrayUser') : System.getenv('BINTRAY_USER')
+            password = project.hasProperty('bintrayKey') ? project.property('bintrayKey') : System.getenv('BINTRAY_KEY')
+        }
+        defaults {
+            publications 'maven'
+            publishArtifacts = true
+            properties = [:]
+            publishPom = true
+        }
+    }
+}
+
+bintrayUpload.dependsOn build
+artifactoryPublish.dependsOn build
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.7'
+    distributionUrl = 'https://services.gradle.org/distributions/gradle-4.7-all.zip'
+}
