@@ -10,7 +10,7 @@ ext {
     github_org = 'Discord4J'
     project_name = 'websocket-client'
     artifact_group = 'com.discord4j'
-    project_version = '0.7.7'
+    project_version = '0.8.0-SNAPSHOT'
     project_description = 'Websocket client over reactor-netty'
     project_jdk = '1.8'
 
@@ -35,7 +35,7 @@ repositories {
 }
 
 dependencies {
-    compile "com.github.quanticc:reactor-netty:eca0461"
+    compile "com.github.quanticc:reactor-netty:4e3356b"
     compile "com.google.code.findbugs:jsr305:$jsr305_version"
 
     testCompile "junit:junit:$junit_version"

@@ -80,9 +80,9 @@ public class WebSocketSession {
      * information.
      */
     public void replaceLoggingHandler() {
-        getDelegate().getInbound().context()
-                .replaceHandler("reactor.left.loggingHandler",
-                        new SimpleLoggingHandler(HttpClient.class, LogLevel.DEBUG));
+        getDelegate().getInbound().withConnection(connection ->
+                connection.replaceHandler("reactor.left.loggingHandler",
+                        new SimpleLoggingHandler(HttpClient.class, LogLevel.DEBUG)));
     }
 
     /**
@@ -93,34 +93,8 @@ public class WebSocketSession {
     public Mono<CloseStatus> closeFuture() {
         MonoProcessor<CloseStatus> reason = MonoProcessor.create();
         // listen to netty event loop to retrieve close reason
-        getDelegate().getInbound().context().addHandlerLast("d4j.last.closeHandler",
-                new ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) {
-                        if (msg instanceof CloseWebSocketFrame && ((CloseWebSocketFrame) msg).isFinalFragment()) {
-                            CloseWebSocketFrame close = (CloseWebSocketFrame) msg;
-                            log.debug("Close status detected: {} {}", close.statusCode(), close.reasonText());
-                            // then push it to our MonoProcessor for the reason
-                            reason.onNext(new CloseStatus(close.statusCode(), close.reasonText()));
-                        }
-                        ctx.fireChannelRead(msg);
-                    }
-
-                    @Override
-                    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-                        if (evt instanceof SslCloseCompletionEvent) {
-                            SslCloseCompletionEvent closeEvent = (SslCloseCompletionEvent) evt;
-                            if (!closeEvent.isSuccess()) {
-                                log.debug("Abnormal close status detected: {}", closeEvent.cause().toString());
-                                // then push it to our MonoProcessor for the reason
-                                if (!reason.isTerminated()) {
-                                    reason.onError(closeEvent.cause());
-                                }
-                            }
-                        }
-                        ctx.fireUserEventTriggered(evt);
-                    }
-                });
+        getDelegate().getInbound().withConnection(connection ->
+                connection.addHandlerLast("client.last.closeHandler", new CloseHandlerAdapter(reason)));
 
         return reason;
     }
@@ -166,4 +140,38 @@ public class WebSocketSession {
         }
     }
 
+    private static class CloseHandlerAdapter extends ChannelInboundHandlerAdapter {
+
+        private final MonoProcessor<CloseStatus> closeStatusFuture;
+
+        private CloseHandlerAdapter(MonoProcessor<CloseStatus> closeStatusFuture) {
+            this.closeStatusFuture = closeStatusFuture;
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            if (msg instanceof CloseWebSocketFrame && ((CloseWebSocketFrame) msg).isFinalFragment()) {
+                CloseWebSocketFrame close = (CloseWebSocketFrame) msg;
+                log.debug("Close status detected: {} {}", close.statusCode(), close.reasonText());
+                // then push it to our MonoProcessor for the reason
+                closeStatusFuture.onNext(new CloseStatus(close.statusCode(), close.reasonText()));
+            }
+            ctx.fireChannelRead(msg);
+        }
+
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+            if (evt instanceof SslCloseCompletionEvent) {
+                SslCloseCompletionEvent closeEvent = (SslCloseCompletionEvent) evt;
+                if (!closeEvent.isSuccess()) {
+                    log.debug("Abnormal close status detected: {}", closeEvent.cause().toString());
+                    // then push it to our MonoProcessor for the reason
+                    if (!closeStatusFuture.isTerminated()) {
+                        closeStatusFuture.onError(closeEvent.cause());
+                    }
+                }
+            }
+            ctx.fireUserEventTriggered(evt);
+        }
+    }
 }
