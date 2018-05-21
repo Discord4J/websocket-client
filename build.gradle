@@ -35,7 +35,7 @@ repositories {
 }
 
 dependencies {
-    compile "com.github.quanticc:reactor-netty:4e3356b"
+    compile "com.github.quanticc:reactor-netty:7df8422"
     compile "com.google.code.findbugs:jsr305:$jsr305_version"
 
     testCompile "junit:junit:$junit_version"
