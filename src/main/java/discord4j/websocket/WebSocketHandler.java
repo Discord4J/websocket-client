@@ -17,12 +17,12 @@
 package discord4j.websocket;
 
 import reactor.core.publisher.Mono;
+import reactor.ipc.netty.ConnectionObserver;
 
 /**
  * Handler for a WebSocket session.
  */
-@FunctionalInterface
-public interface WebSocketHandler {
+public interface WebSocketHandler extends ConnectionObserver {
 
     /**
      * Handle the WebSocket session.

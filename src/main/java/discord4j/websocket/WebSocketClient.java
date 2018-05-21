@@ -17,6 +17,7 @@
 package discord4j.websocket;
 
 import reactor.core.publisher.Mono;
+import reactor.ipc.netty.ConnectionObserver;
 import reactor.ipc.netty.http.client.HttpClient;
 
 /**
@@ -44,6 +45,7 @@ public class WebSocketClient {
     public Mono<Void> execute(String uri, WebSocketHandler handler) {
         return this.httpClient
                 .wiretap()
+                .observe(handler)
                 .websocket()
                 .uri(uri)
                 .handle((in, out) -> handler.handle(new WebSocketSession(in, out)))
